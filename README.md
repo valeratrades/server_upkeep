@@ -7,6 +7,37 @@
 [<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/valeratrades/server_upkeep/errors.yml?branch=master&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/valeratrades/server_upkeep/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
 [<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/valeratrades/server_upkeep/warnings.yml?branch=master&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/valeratrades/server_upkeep/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
 
+Monitor server directories and send Telegram alerts when size thresholds are exceeded.
+<!-- markdownlint-disable -->
+<details>
+<summary>
+<h3>Installation</h3>
+</summary>
+
+```sh
+cargo install --git https://github.com/valeratrades/server_upkeep
+```
+
+</details>
+<!-- markdownlint-restore -->
+
+## Usage
+```sh
+server_upkeep monitor
+```
+
+Config at `~/.config/server_upkeep.nix`:
+```nix
+{
+  telegram = {
+    bot_token = "your_bot_token";
+    alerts_chat = "your_chat_id";
+  };
+  monitor = {
+    max_size = "5GB";  # human-readable: 500MB, 1.5TB, etc.
+  };
+}
+```
 
 
 
