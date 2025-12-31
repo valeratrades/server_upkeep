@@ -12,6 +12,7 @@ clap = { version = "^4", features = ["derive"] }
 color-eyre = "^0.6.3"
 derive-new = "^0"
 dirs = "^5"
+nix = { version = "^0.29", features = ["fs"] }
 reqwest = { version = "^0.12", features = ["json"] }
 serde = { version = "^1", features = ["derive"] }
 tokio = { version = "^1", features = ["full"] }
