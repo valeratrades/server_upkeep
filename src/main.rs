@@ -8,10 +8,10 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use color_eyre::eyre::{Result, eyre};
-use config::{AppConfig, ByteSize, SettingsFlags};
+use config::{AppConfig, SettingsFlags};
 use reqwest::Client;
 use tracing::{error, info};
-use v_utils::xdg_state_file;
+use v_utils::{utils::InfoSize, xdg_state_file};
 
 #[derive(Parser)]
 #[command(author, version = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_HASH"), ")"), about, long_about = None)]
@@ -60,7 +60,7 @@ async fn monitor(config: AppConfig) -> Result<()> {
 		// Check ~/.local/state directory size
 		match get_dir_size(&state_dir) {
 			Ok(size_bytes) => {
-				let size = ByteSize(size_bytes);
+				let size = InfoSize::from_parts(size_bytes, v_utils::utils::InfoSizeUnit::Byte);
 				let max_size = config.monitor.max_size;
 				info!("~/.local/state size: {size} (threshold: {max_size})");
 

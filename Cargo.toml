@@ -17,7 +17,7 @@ reqwest = { version = "^0.13", features = ["json", "form"] }
 serde = { version = "^1", features = ["derive"] }
 tokio = { version = "^1", features = ["full"] }
 tracing = "^0.1.44"
-v_utils = { version = "^2.15.14", features = ["macros", "cli"] }
+v_utils = { git = "https://github.com/valeratrades/v_utils", features = ["macros", "cli"] }
 
 [lints.clippy]
 # Stable

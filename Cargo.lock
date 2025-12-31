@@ -3024,8 +3024,7 @@ dependencies = [
 [[package]]
 name = "v_utils"
 version = "2.15.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea45ba4a0f6845770a09d3d752fb858a36a97aadff3701824e887a0d4287803b"
+source = "git+https://github.com/valeratrades/v_utils#5666810906a273caa8505fb8feed32e088effcbc"
 dependencies = [
  "config",
  "const_format",
@@ -3057,8 +3056,7 @@ dependencies = [
 [[package]]
 name = "v_utils_macros"
 version = "2.11.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e66caadfbb79dc106f621265b69b2f443dcea854e8811b3e0464f83004b9d235"
+source = "git+https://github.com/valeratrades/v_utils#5666810906a273caa8505fb8feed32e088effcbc"
 dependencies = [
  "eyre",
  "heck",
