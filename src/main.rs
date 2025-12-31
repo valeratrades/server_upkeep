@@ -10,6 +10,7 @@ use clap::{Parser, Subcommand};
 use color_eyre::eyre::{Result, eyre};
 use config::{AppConfig, ByteSize, SettingsFlags};
 use reqwest::Client;
+use tracing::{error, info};
 use v_utils::xdg_state_file;
 
 #[derive(Parser)]
@@ -50,27 +51,38 @@ async fn main() -> Result<()> {
 
 const DISK_USAGE_THRESHOLDS: &[u8] = &[50, 60, 70, 80, 90, 95];
 const DISK_USAGE_RESET_THRESHOLD: u8 = 45;
+const MONITOR_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
 
 async fn monitor(config: AppConfig) -> Result<()> {
-	// Check ~/.local/state directory size
 	let state_dir = dirs::state_dir().ok_or_else(|| eyre!("Could not determine state directory"))?;
-	let size = ByteSize(get_dir_size(&state_dir)?);
-	let max_size = config.monitor.max_size;
 
-	println!("~/.local/state size: {size} (threshold: {max_size})");
+	loop {
+		// Check ~/.local/state directory size
+		match get_dir_size(&state_dir) {
+			Ok(size_bytes) => {
+				let size = ByteSize(size_bytes);
+				let max_size = config.monitor.max_size;
+				info!("~/.local/state size: {size} (threshold: {max_size})");
 
-	if size > max_size {
-		let message = format!("⚠️ Server Alert: ~/.local/state is {size}, exceeds threshold of {max_size}");
-		send_telegram_alert(&config.telegram, &message).await?;
-		println!("Alert sent to Telegram");
-	} else {
-		println!("Size is within limits, no alert needed");
+				if size > max_size {
+					let message = format!("⚠️ Server Alert: ~/.local/state is {size}, exceeds threshold of {max_size}");
+					if let Err(e) = send_telegram_alert(&config.telegram, &message).await {
+						error!("Failed to send state dir alert: {e}");
+					} else {
+						info!("State dir alert sent to Telegram");
+					}
+				}
+			}
+			Err(e) => error!("Failed to get state directory size: {e}"),
+		}
+
+		// Check disk usage percentage of /
+		if let Err(e) = check_disk_usage(&config).await {
+			error!("Failed to check disk usage: {e}");
+		}
+
+		tokio::time::sleep(MONITOR_INTERVAL).await;
 	}
-
-	// Check disk usage percentage of /
-	check_disk_usage(&config).await?;
-
-	Ok(())
 }
 
 async fn check_disk_usage(config: &AppConfig) -> Result<()> {
@@ -80,7 +92,7 @@ async fn check_disk_usage(config: &AppConfig) -> Result<()> {
 	let used_blocks = total_blocks - available_blocks;
 	let usage_pct = (used_blocks as f64 / total_blocks as f64 * 100.0) as u8;
 
-	println!("/ disk usage: {usage_pct}%");
+	info!("/ disk usage: {usage_pct}%");
 
 	let state_file = xdg_state_file!("last_pct_used");
 
@@ -88,16 +100,16 @@ async fn check_disk_usage(config: &AppConfig) -> Result<()> {
 	if usage_pct < DISK_USAGE_RESET_THRESHOLD {
 		if state_file.exists() {
 			fs::remove_file(&state_file)?;
-			println!("Disk usage below {DISK_USAGE_RESET_THRESHOLD}%, cleared alert state");
+			info!("Disk usage below {DISK_USAGE_RESET_THRESHOLD}%, cleared alert state");
 		}
 		return Ok(());
 	}
 
-	// Find the highest threshold that current usage exceeds
+	// Find the highest threshold that current usage exceeds (minimum is 50%)
 	let current_threshold = DISK_USAGE_THRESHOLDS.iter().rev().find(|&&t| usage_pct >= t).copied();
 
 	let Some(threshold) = current_threshold else {
-		println!("Disk usage below alerting thresholds, no alert needed");
+		// usage_pct is between DISK_USAGE_RESET_THRESHOLD and 50%, no alert needed
 		return Ok(());
 	};
 
@@ -107,11 +119,13 @@ async fn check_disk_usage(config: &AppConfig) -> Result<()> {
 	// Only alert if we crossed a new threshold
 	if last_alerted.is_none() || threshold > last_alerted.unwrap() {
 		let message = format!("⚠️ Server Alert: / disk usage at {usage_pct}% (crossed {threshold}% threshold)");
-		send_telegram_alert(&config.telegram, &message).await?;
-		fs::write(&state_file, threshold.to_string())?;
-		println!("Disk usage alert sent for {threshold}% threshold");
-	} else {
-		println!("Already alerted at {threshold}% threshold, no new alert needed");
+		match send_telegram_alert(&config.telegram, &message).await {
+			Ok(()) => {
+				fs::write(&state_file, threshold.to_string())?;
+				info!("Disk usage alert sent for {threshold}% threshold");
+			}
+			Err(e) => error!("Failed to send disk usage alert: {e}"),
+		}
 	}
 
 	Ok(())
