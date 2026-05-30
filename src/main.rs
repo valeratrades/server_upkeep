@@ -7,12 +7,15 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
-use color_eyre::eyre::{Result, eyre};
+use color_eyre::eyre::{Result, bail, eyre};
 use config::{AppConfig, SettingsFlags};
 use reqwest::Client;
 use tracing::{error, info};
 use v_utils::{utils::InfoSize, xdg_state_file};
 
+const DISK_USAGE_THRESHOLDS: &[u8] = &[50, 60, 70, 80, 90, 95];
+const DISK_USAGE_RESET_THRESHOLD: u8 = 45;
+const MONITOR_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
 #[derive(Parser)]
 #[command(author, version = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_HASH"), ")"), about, long_about = None)]
 struct Cli {
@@ -48,10 +51,6 @@ async fn main() -> Result<()> {
 
 	Ok(())
 }
-
-const DISK_USAGE_THRESHOLDS: &[u8] = &[50, 60, 70, 80, 90, 95];
-const DISK_USAGE_RESET_THRESHOLD: u8 = 45;
-const MONITOR_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
 
 async fn monitor(config: AppConfig) -> Result<()> {
 	let state_dir = dirs::state_dir().ok_or_else(|| eyre!("Could not determine state directory"))?;
@@ -159,7 +158,7 @@ async fn send_telegram_alert(config: &config::TelegramConfig, message: &str) -> 
 
 	if !response.status().is_success() {
 		let error_text = response.text().await?;
-		return Err(eyre!("Failed to send Telegram message: {error_text}"));
+		bail!("Failed to send Telegram message: {error_text}");
 	}
 
 	Ok(())
