@@ -3,9 +3,19 @@ cargo-features = ["codegen-backend"]
 name = "server_upkeep"
 version = "0.1.0"
 edition = "2024"
+authors = ["Valeriy Sakharov <valeratrades@gmail.com>"]
+description = "server monitoring/upkeep daemon"
+readme = "README.md"
+license = "BlueOak-1.0.0"
+repository = "https://github.com/valeratrades/server_upkeep"
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
 
 [dependencies]
 clap = { version = "=4.6.1", features = ["derive"] }

@@ -1,12 +1,12 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    flake-utils.url = "github:numtide/flake-utils";
-    pre-commit-hooks.url = "github:cachix/git-hooks.nix";
-    v-utils.url = "github:valeratrades/v_flakes?ref=v1.3";
+    nixpkgs.url = "github:NixOS/nixpkgs/f61125a668a320878494449750330ca58b78c557";
+    rust-overlay.url = "github:oxalica/rust-overlay/7ed7e8c74be95906275805db68201e74e9904f07";
+    flake-utils.url = "github:numtide/flake-utils/11707dc2f618dd54ca8739b309ec4fc024de578b";
+    pre-commit-hooks.url = "github:cachix/git-hooks.nix/ca5b894d3e3e151ffc1db040b6ce4dcc75d31c37";
+    v_flakes.url = "github:valeratrades/v_flakes/257142a54b071bb8a8b2e031d69e70f416518a5f";
   };
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, v-utils }:
+  outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, v_flakes }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
@@ -15,30 +15,39 @@
           inherit system overlays;
           allowUnfree = true;
         };
+        ##NB: can't load rust-bin from nightly.latest, as there are week guarantees of which components will be available on each day.
         rust = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
           extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
         });
-        pre-commit-check = pre-commit-hooks.lib.${system}.run (v-utils.files.preCommit { inherit pkgs; });
+        pre-commit-check = pre-commit-hooks.lib.${system}.run (v_flakes.files.preCommit { inherit pkgs; });
         manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
         pname = manifest.name;
         stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
 
-        github = v-utils.github {
-          inherit pkgs pname;
-          lastSupportedVersion = "nightly-2025-12-09";
-          jobsErrors = [ "rust-tests" ];
-          jobsWarnings = [ "rust-doc" "rust-clippy" "rust-machete" "rust-sorted" "rust-sorted-derives" "rust-unused-features" "tokei" ];
-          jobsOther = [ "loc-badge" ];
-          langs = [ "rs" ];
+        rs = v_flakes.rs {
+          inherit pkgs rust;
+          cranelift = true;
+          build = {
+            enable = true;
+            workspace."./" = [ "git_version" "log_directives" ];
+          };
         };
-        rs = v-utils.rs { inherit pkgs; };
-        readme = v-utils.readme-fw {
+        github = v_flakes.github {
+          inherit pkgs pname rs;
+          enable = true;
+          lastSupportedVersion = "nightly-2025-12-09";
+          jobs.default = true;
+          jobs.warnings.install = { packages = [ "mold" ]; debug = true; };
+          release.default = true;
+        };
+        readme = v_flakes.readme-fw {
           inherit pkgs pname;
           lastSupportedVersion = "nightly-1.93";
           rootDir = ./.;
-          licenses = [{ name = "Blue Oak 1.0.0"; outPath = "LICENSE"; }];
+          licenses = [{ license = v_flakes.files.licenses.blue_oak; }];
           badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ];
         };
+        combined = v_flakes.utils.combine [ rs github readme ];
       in
       {
         packages =
@@ -50,7 +59,7 @@
             };
           in
           {
-            default = rustPlatform.buildRustPackage rec {
+            default = rustPlatform.buildRustPackage {
               inherit pname;
               version = manifest.version;
 
@@ -69,28 +78,23 @@
           mkShell {
             inherit stdenv;
             shellHook =
-              pre-commit-check.shellHook
-              + github.shellHook
-              + rs.shellHook
-              + ''
-                cp -f ${v-utils.files.licenses.blue_oak} ./LICENSE
-                cp -f ${(v-utils.files.treefmt) { inherit pkgs; }} ./.treefmt.toml
-                cp -f ${(v-utils.files.rust.clippy { inherit pkgs; })} ./.cargo/.clippy.toml
-
-                cp -f ${readme} ./README.md
-
-                alias qr="./target/debug/${pname}"
+              pre-commit-check.shellHook +
+              combined.shellHook +
+              ''
+                cp -f ${(v_flakes.files.treefmt) { inherit pkgs; }} ./.treefmt.toml
               '';
-
             packages = [
-              mold
+              mold-wrapped
               openssl
               pkg-config
               rust
-            ] ++ pre-commit-check.enabledPackages ++ github.enabledPackages;
+            ] ++ pre-commit-check.enabledPackages ++ combined.enabledPackages;
 
-            env.RUST_BACKTRACE = 1;
-            env.RUST_LIB_BACKTRACE = 0;
+            env = {
+              RUST_BACKTRACE = 1;
+              RUST_LIB_BACKTRACE = 0;
+              CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG = true;
+            };
           };
       }
     );
