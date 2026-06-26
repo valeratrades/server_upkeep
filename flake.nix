@@ -160,8 +160,10 @@
               path = optional isNixCfg pkgs.nix;
               environment = {
                 "SERVER_UPKEEP__MONITOR__MAX_SIZE" = cfg.maxSize;
-                # DynamicUser has no $HOME; point the state dir at StateDirectory so
-                # dirs::state_dir() resolves and xdg_state_file writes land there.
+                # DynamicUser has no $HOME — v_utils reads it directly (xdg.rs) and
+                # panics otherwise. Point both it and XDG_STATE_HOME at StateDirectory
+                # so dirs::state_dir() resolves and xdg_state_file writes land there.
+                HOME = "/var/lib/${pname}";
                 XDG_STATE_HOME = "/var/lib/${pname}";
                 SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
               };
