@@ -7,6 +7,10 @@
     v_flakes.url = "github:valeratrades/v_flakes/257142a54b071bb8a8b2e031d69e70f416518a5f";
   };
   outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, v_flakes }:
+    let
+      manifest = (nixpkgs.lib.importTOML ./Cargo.toml).package;
+      pname = manifest.name;
+    in
     flake-utils.lib.eachDefaultSystem (
       system:
       let
@@ -20,8 +24,6 @@
           extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
         });
         pre-commit-check = pre-commit-hooks.lib.${system}.run (v_flakes.files.preCommit { inherit pkgs; });
-        manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
-        pname = manifest.name;
         stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
 
         rs = v_flakes.rs {
@@ -97,5 +99,86 @@
             };
           };
       }
-    );
+    )
+    // {
+      # System service running `server_upkeep monitor`. Secrets are NOT baked in:
+      # the telegram credentials arrive as SERVER_UPKEEP__TELEGRAM__* env vars from
+      # `environmentFile` (config-rs reads them; precedence is env < file < flags),
+      # so nothing sensitive ever lands in the nix store. `maxSize` is the only
+      # non-secret knob, passed the same way to avoid needing a config file at all.
+      nixosModules."${pname}" = { config, lib, pkgs, ... }:
+        let
+          inherit (lib) mkEnableOption mkOption mkIf types optional optionalString optionalAttrs;
+          cfg = config.services."${pname}";
+          isNixCfg = cfg.configFile != null && lib.hasSuffix ".nix" cfg.configFile;
+        in
+        {
+          options.services."${pname}" = {
+            enable = mkEnableOption "server_upkeep disk/state monitor (alerts to telegram)";
+
+            package = mkOption {
+              type = types.package;
+              default = self.packages.${pkgs.system}.default;
+              description = "The package to use.";
+            };
+
+            environmentFile = mkOption {
+              type = types.nullOr types.path;
+              default = null;
+              description = ''
+                systemd EnvironmentFile providing the secrets referenced by the
+                config, e.g. SERVER_UPKEEP__TELEGRAM__BOT_TOKEN and
+                SERVER_UPKEEP__TELEGRAM__ALERTS_CHAT. The unit stays inactive until
+                this file exists, so it never crash-loops before provisioning.
+              '';
+            };
+
+            configFile = mkOption {
+              type = types.nullOr types.path;
+              default = null;
+              description = ''
+                Optional config file (.nix/.toml/…). Leave null to configure purely
+                via env vars. A `.nix` config makes the binary shell out to `nix
+                eval` at runtime, so `nix` is added to the unit PATH automatically.
+                Never commit secrets here — use environmentFile.
+              '';
+            };
+
+            maxSize = mkOption {
+              type = types.str;
+              default = "10GB";
+              description = "Alert threshold for the monitored state dir size.";
+            };
+          };
+
+          config = mkIf cfg.enable {
+            systemd.services."${pname}" = {
+              description = "server_upkeep monitor (disk + state-dir thresholds -> telegram)";
+              after = [ "network-online.target" ];
+              wants = [ "network-online.target" ];
+              wantedBy = [ "multi-user.target" ];
+              path = optional isNixCfg pkgs.nix;
+              environment = {
+                "SERVER_UPKEEP__MONITOR__MAX_SIZE" = cfg.maxSize;
+                # DynamicUser has no $HOME; point the state dir at StateDirectory so
+                # dirs::state_dir() resolves and xdg_state_file writes land there.
+                XDG_STATE_HOME = "/var/lib/${pname}";
+                SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+              };
+              unitConfig = optionalAttrs (cfg.environmentFile != null) {
+                ConditionPathExists = cfg.environmentFile;
+              };
+              serviceConfig = {
+                ExecStart = "${cfg.package}/bin/${pname} monitor"
+                  + optionalString (cfg.configFile != null) " --config ${cfg.configFile}";
+                EnvironmentFile = mkIf (cfg.environmentFile != null) cfg.environmentFile;
+                Restart = "on-failure";
+                RestartSec = 10;
+                DynamicUser = true;
+                StateDirectory = pname;
+              };
+            };
+          };
+        };
+    };
 }
