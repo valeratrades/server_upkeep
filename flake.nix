@@ -102,10 +102,12 @@
     )
     // {
       # System service running `server_upkeep monitor`. Secrets are NOT baked in:
-      # the telegram credentials arrive as SERVER_UPKEEP__TELEGRAM__* env vars from
-      # `environmentFile` (config-rs reads them; precedence is env < file < flags),
-      # so nothing sensitive ever lands in the nix store. `maxSize` is the only
-      # non-secret knob, passed the same way to avoid needing a config file at all.
+      # the alert sink arrives as SERVER_UPKEEP__ALERT* env vars from `environmentFile`
+      # (config-rs reads them; precedence is env < file < flags), so nothing sensitive
+      # ever lands in the nix store. `alert` is either a command string
+      # (SERVER_UPKEEP__ALERT="v_notify -a tg -l error -") that the alert text is piped
+      # into, or telegram creds (SERVER_UPKEEP__ALERT__BOT_TOKEN / __ALERTS_CHAT).
+      # `maxSize` is the only non-secret knob, passed the same way to avoid a config file.
       nixosModules."${pname}" = { config, lib, pkgs, ... }:
         let
           inherit (lib) mkEnableOption mkOption mkIf types optional optionalString optionalAttrs;
@@ -114,7 +116,7 @@
         in
         {
           options.services."${pname}" = {
-            enable = mkEnableOption "server_upkeep disk/state monitor (alerts to telegram)";
+            enable = mkEnableOption "server_upkeep disk/state monitor (alerts via telegram or a command)";
 
             package = mkOption {
               type = types.package;
@@ -127,9 +129,10 @@
               default = null;
               description = ''
                 systemd EnvironmentFile providing the secrets referenced by the
-                config, e.g. SERVER_UPKEEP__TELEGRAM__BOT_TOKEN and
-                SERVER_UPKEEP__TELEGRAM__ALERTS_CHAT. The unit stays inactive until
-                this file exists, so it never crash-loops before provisioning.
+                config, e.g. SERVER_UPKEEP__ALERT (a command string) or
+                SERVER_UPKEEP__ALERT__BOT_TOKEN + SERVER_UPKEEP__ALERT__ALERTS_CHAT
+                for telegram. The unit stays inactive until this file exists, so it
+                never crash-loops before provisioning.
               '';
             };
 
@@ -153,7 +156,7 @@
 
           config = mkIf cfg.enable {
             systemd.services."${pname}" = {
-              description = "server_upkeep monitor (disk + state-dir thresholds -> telegram)";
+              description = "server_upkeep monitor (disk + state-dir thresholds -> alert)";
               after = [ "network-online.target" ];
               wants = [ "network-online.target" ];
               wantedBy = [ "multi-user.target" ];

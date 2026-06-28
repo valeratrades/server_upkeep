@@ -65,7 +65,7 @@ async fn monitor(config: AppConfig) -> Result<()> {
 
 				if size > max_size {
 					let message = format!("⚠️ Server Alert: ~/.local/state is {size}, exceeds threshold of {max_size}");
-					if let Err(e) = send_telegram_alert(&config.telegram, &message).await {
+					if let Err(e) = send_alert(&config.alert, &message).await {
 						error!("Failed to send state dir alert: {e}");
 					} else {
 						info!("State dir alert sent to Telegram");
@@ -118,7 +118,7 @@ async fn check_disk_usage(config: &AppConfig) -> Result<()> {
 	// Only alert if we crossed a new threshold
 	if last_alerted.is_none() || threshold > last_alerted.unwrap() {
 		let message = format!("⚠️ Server Alert: / disk usage at {usage_pct}% (crossed {threshold}% threshold)");
-		match send_telegram_alert(&config.telegram, &message).await {
+		match send_alert(&config.alert, &message).await {
 			Ok(()) => {
 				fs::write(&state_file, threshold.to_string())?;
 				info!("Disk usage alert sent for {threshold}% threshold");
@@ -146,6 +146,23 @@ fn get_dir_size(path: &Path) -> Result<u64> {
 	}
 
 	Ok(total_size)
+}
+
+async fn send_alert(alert: &config::Alert, message: &str) -> Result<()> {
+	match alert {
+		config::Alert::Telegram(tg) => send_telegram_alert(tg, message).await,
+		config::Alert::Command(cmd) => {
+			use tokio::io::AsyncWriteExt as _;
+			let mut child = tokio::process::Command::new("sh").arg("-c").arg(cmd).stdin(std::process::Stdio::piped()).spawn()?;
+			// `take` so the ChildStdin drops at statement end -> EOF, letting the child finish reading and exit.
+			child.stdin.take().expect("stdin piped above").write_all(message.as_bytes()).await?;
+			let status = child.wait().await?;
+			if !status.success() {
+				bail!("alert command `{cmd}` exited with {status}");
+			}
+			Ok(())
+		}
+	}
 }
 
 async fn send_telegram_alert(config: &config::TelegramConfig, message: &str) -> Result<()> {

@@ -7,7 +7,7 @@
 [<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/valeratrades/server_upkeep/errors.yml?branch=master&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/valeratrades/server_upkeep/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
 [<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/valeratrades/server_upkeep/warnings.yml?branch=master&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/valeratrades/server_upkeep/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
 
-Monitor server directories and send Telegram alerts when size thresholds are exceeded.
+Monitor server directories and alert (via Telegram or an arbitrary command) when size thresholds are exceeded.
 <!-- markdownlint-disable -->
 <details>
 <summary>
@@ -26,13 +26,11 @@ cargo install --git https://github.com/valeratrades/server_upkeep
 server_upkeep monitor
 ```
 
-Config at `~/.config/server_upkeep.nix`:
+Config at `~/.config/server_upkeep.nix`. `alert` is either a shell command the
+alert text is piped into (stdin), or a Telegram table:
 ```nix
 {
-  telegram = {
-    bot_token = "your_bot_token";
-    alerts_chat = "your_chat_id";
-  };
+  alert = "v_notify -a tg -l error -"; # or a table: { bot_token = "..."; alerts_chat = "..."; }
   monitor = {
     max_size = "5GB";  # human-readable: 500MB, 1.5TB, etc.
   };

@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use v_utils::{
 	macros::{MyConfigPrimitives, Settings},
 	utils::InfoSize,
@@ -5,8 +6,23 @@ use v_utils::{
 
 #[derive(Clone, Debug, Default, MyConfigPrimitives, Settings)]
 pub struct AppConfig {
-	pub telegram: TelegramConfig,
+	pub alert: Alert,
 	pub monitor: MonitorConfig,
+}
+
+/// Alert sink. A bare string is a shell command the alert text is piped into via stdin
+/// (e.g. `"v_notify -a tg -l error -"`); a table selects built-in Telegram delivery.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
+pub enum Alert {
+	Command(String),
+	Telegram(TelegramConfig),
+}
+
+impl Default for Alert {
+	fn default() -> Self {
+		Self::Telegram(TelegramConfig::default())
+	}
 }
 
 #[derive(Clone, Debug, Default, MyConfigPrimitives)]

@@ -1,8 +1,5 @@
 {
-  telegram = {
-    bot_token = "test_token";
-    alerts_chat = "test_chat_id";
-  };
+  alert = "v_notify -a tg -l error -";
   monitor = {
     max_size = "5GB";
   };
