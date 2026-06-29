@@ -1,4 +1,9 @@
 {
+  nixConfig = {
+    extra-substituters = [ "https://valeratrades.cachix.org" ];
+    extra-trusted-public-keys = [ "valeratrades.cachix.org-1:gXVwhzO5YB+BaiEJYT48qZgzdaErGQew6xtZcz4Fo1Q=" ];
+  };
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/f61125a668a320878494449750330ca58b78c557";
     rust-overlay.url = "github:oxalica/rust-overlay/7ed7e8c74be95906275805db68201e74e9904f07";
