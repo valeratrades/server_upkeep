@@ -26,9 +26,9 @@ miette = { version = "=7.6.0", features = ["fancy"] }
 nix = { version = "=0.31.2", features = ["fs"] }
 reqwest = { version = "=0.13.2", features = ["json", "form"] }
 serde = { version = "=1.0.228", features = ["derive"] }
-tokio = { version = "=1.52.0", features = ["full"] }
+tokio = { version = "=1.52.4", features = ["full"] }
 tracing = "=0.1.44"
-v_utils = { version = "=2.15.31", features = ["macros", "cli", "tracing"] }
+v_utils = { version = "=2.17.6", features = ["macros", "cli", "tracing"] }
 
 [lints.clippy]
 # Stable

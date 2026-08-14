@@ -11,7 +11,7 @@ use color_eyre::eyre::{Result, bail, eyre};
 use config::{AppConfig, SettingsFlags};
 use reqwest::Client;
 use tracing::{error, info};
-use v_utils::{utils::InfoSize, xdg_state_file};
+use v_utils::{InfoSize, InfoSizeUnit, xdg_state_file};
 
 const DISK_USAGE_THRESHOLDS: &[u8] = &[50, 60, 70, 80, 90, 95];
 const DISK_USAGE_RESET_THRESHOLD: u8 = 45;
@@ -59,7 +59,7 @@ async fn monitor(config: AppConfig) -> Result<()> {
 		// Check ~/.local/state directory size
 		match get_dir_size(&state_dir) {
 			Ok(size_bytes) => {
-				let size = InfoSize::from_parts(size_bytes, v_utils::utils::InfoSizeUnit::Byte);
+				let size = InfoSize::from_parts(size_bytes, InfoSizeUnit::Byte);
 				let max_size = config.monitor.max_size;
 				info!("~/.local/state size: {size} (threshold: {max_size})");
 
