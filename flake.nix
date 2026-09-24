@@ -59,6 +59,9 @@
                 ];
                 nativeBuildInputs = with pkgs; [ pkg-config ];
                 RUSTC_WRAPPER = ""; # .cargo/config.toml sets sccache, absent in the sandbox
+                # std's panic locations name its source inside the toolchain, which would pull all of it into the closure
+                RUSTFLAGS = "--remap-path-prefix=${rust}=/rust";
+                disallowedReferences = [ rust ];
 
                 cargoLock.lockFile = ./Cargo.lock;
                 src = pkgs.lib.cleanSource ./.;
