@@ -13,8 +13,8 @@ use reqwest::Client;
 use tracing::{error, info};
 use v_utils::{InfoSize, InfoSizeUnit, xdg_state_file};
 
-const DISK_USAGE_THRESHOLDS: &[u8] = &[50, 60, 70, 80, 90, 95];
-const DISK_USAGE_RESET_THRESHOLD: u8 = 45;
+const DISK_USAGE_LADDER: &[u8] = &[60, 70, 80, 90, 95];
+const DISK_USAGE_RESET_MARGIN: u8 = 5; // hysteresis below the lowest threshold, so it doesn't re-arm on every small dip
 const MONITOR_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
 #[derive(Parser)]
 #[command(author, version = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_HASH"), ")"), about, long_about = None)]
@@ -93,22 +93,29 @@ async fn check_disk_usage(config: &AppConfig) -> Result<()> {
 
 	info!("/ disk usage: {usage_pct}%");
 
+	let min_pct = config.monitor.disk_alert_pct;
+	assert!(
+		(DISK_USAGE_RESET_MARGIN..=100).contains(&min_pct),
+		"monitor.disk_alert_pct must be in {DISK_USAGE_RESET_MARGIN}..=100, got {min_pct}"
+	);
+	let reset_pct = min_pct - DISK_USAGE_RESET_MARGIN;
+
 	let state_file = xdg_state_file!("last_pct_used");
 
-	// If usage dropped below reset threshold, delete state file
-	if usage_pct < DISK_USAGE_RESET_THRESHOLD {
+	if usage_pct < reset_pct {
 		if state_file.exists() {
 			fs::remove_file(&state_file)?;
-			info!("Disk usage below {DISK_USAGE_RESET_THRESHOLD}%, cleared alert state");
+			info!("Disk usage below {reset_pct}%, cleared alert state");
 		}
 		return Ok(());
 	}
 
-	// Find the highest threshold that current usage exceeds (minimum is 50%)
-	let current_threshold = DISK_USAGE_THRESHOLDS.iter().rev().find(|&&t| usage_pct >= t).copied();
+	let current_threshold = std::iter::once(min_pct)
+		.chain(DISK_USAGE_LADDER.iter().copied().filter(|&t| t > min_pct))
+		.filter(|&t| usage_pct >= t)
+		.last();
 
 	let Some(threshold) = current_threshold else {
-		// usage_pct is between DISK_USAGE_RESET_THRESHOLD and 50%, no alert needed
 		return Ok(());
 	};
 

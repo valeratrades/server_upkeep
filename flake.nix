@@ -145,6 +145,11 @@
               default = "10GB";
               description = "Alert threshold for the monitored state dir size.";
             };
+
+            diskAlertPct = mkOption {
+              type = types.ints.between 5 100;
+              description = "Lowest `/` usage % that alerts; higher steps (60..95) alert on top.";
+            };
           };
 
           config = mkIf cfg.enable {
@@ -156,6 +161,7 @@
               path = optional isNixCfg pkgs.nix;
               environment = {
                 "SERVER_UPKEEP__MONITOR__MAX_SIZE" = cfg.maxSize;
+                "SERVER_UPKEEP__MONITOR__DISK_ALERT_PCT" = toString cfg.diskAlertPct;
                 # DynamicUser has no $HOME — v_utils reads it directly (xdg.rs) and
                 # panics otherwise. Point both it and XDG_STATE_HOME at StateDirectory
                 # so dirs::state_dir() resolves and xdg_state_file writes land there.

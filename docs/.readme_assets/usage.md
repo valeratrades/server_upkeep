@@ -9,6 +9,7 @@ alert text is piped into (stdin), or a Telegram table:
   alert = "v_notify -a tg -l error -"; # or a table: { bot_token = "..."; alerts_chat = "..."; }
   monitor = {
     max_size = "5GB";  # human-readable: 500MB, 1.5TB, etc.
+    disk_alert_pct = 80;  # lowest `/` usage % that alerts
   };
 }
 ```

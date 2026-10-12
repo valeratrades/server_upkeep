@@ -4,7 +4,7 @@ use v_utils::{
 	macros::{MyConfigPrimitives, Settings},
 };
 
-#[derive(Clone, Debug, Default, MyConfigPrimitives, Settings)]
+#[derive(Clone, Debug, MyConfigPrimitives, Settings)]
 pub struct AppConfig {
 	pub alert: Alert,
 	pub monitor: MonitorConfig,
@@ -36,12 +36,8 @@ pub struct MonitorConfig {
 	/// Maximum allowed size for ~/.local/state (e.g., "20GB", "500MB")
 	#[serde(default = "__default_max_size")]
 	pub max_size: InfoSize,
-}
-
-impl Default for MonitorConfig {
-	fn default() -> Self {
-		Self { max_size: __default_max_size() }
-	}
+	/// Lowest `/` usage % that alerts; higher steps of the built-in ladder (60..95) alert on top
+	pub disk_alert_pct: u8,
 }
 
 fn __default_max_size() -> InfoSize {
