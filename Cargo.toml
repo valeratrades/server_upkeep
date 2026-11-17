@@ -41,8 +41,11 @@ tabs_in_doc_comments = "allow"
 # const fns, so actually more performant
 get_first = "allow"
 get_last_with_len = "allow"
+if_not_else = "warn"
+integer_division = "warn"
 
 [lints.rust]
+stable_features = "allow"
 unused_features = "allow"
 
 [lints.cargo]
