@@ -23,17 +23,18 @@
           stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
 
           rs = v_flakes.rs { inherit pkgs rust; };
+          oldestSupportedVersion = "nightly-${v_flakes.rs.nightly_version}";
           github = v_flakes.github {
             inherit pkgs pname rs;
             enable = true;
-            lastSupportedVersion = "nightly-${v_flakes.rs.nightly_version}";
+            inherit oldestSupportedVersion;
             jobs.default = true;
             jobs.warnings.install = { packages = [ "mold" ]; debug = true; };
             release.default = true;
           };
           readme = v_flakes.readme-fw {
             inherit pkgs pname;
-            lastSupportedVersion = "nightly-1.93";
+            inherit oldestSupportedVersion;
             rootDir = ./.;
             licenses = [{ license = v_flakes.files.licenses.blue_oak; }];
             badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ];
